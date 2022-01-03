@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -118,41 +119,57 @@ func (d *Distributeur) addCmd(boisson string, quantity int) {
 
 func (d *Distributeur) maintenance() {
 	for {
-		fmt.Println("Souhaitez vous export les données ou faire le réassort ? ")
-		boisson := d.getUserInput()
-		if boisson == "export" {
-			file, err := os.Create("export.csv")
-			if err != nil {
-				log.Fatalf("Error %v", err)
-			}
-
-			defer file.Close()
-
-			writer := csv.NewWriter(file)
-
-			defer writer.Flush()
-			break
-		}
-
-		fmt.Println("Modifier une boisson:")
-		for boisson, stock := range d.boissons {
-			fmt.Printf("* %s: (%d)\n", boisson, stock)
-		}
-		boisson = d.getUserInput()
-		if boisson == "running" {
+		action := ""
+		fmt.Println("Actions: export,restock,return")
+		fmt.Scanln(&action)
+		switch action {
+		case "restock":
+			d.Restock()
+		case "export":
+			d.Export()
+		case "return":
 			d.Mtnce = false
-			break
+			return
 		}
-
-		_, ok := d.boissons[boisson]
-		if !ok {
-			continue
-		}
-		addStock := 0
-		fmt.Println("Combien:")
-		fmt.Scanln(&addStock)
-		d.boissons[boisson] = d.boissons[boisson] + addStock
-
 	}
 }
+func (d *Distributeur) Export() error {
+	file, err := os.Create("export.csv")
+	if err != nil {
+		log.Fatalf("Error %v", err)
+	}
+
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	writer.Write([]string{"time", "boisson", "quantity"})
+
+	for _, cmd := range d.Cmds {
+		err := writer.Write([]string{cmd.Date.Format("2006/01/02 15:04:05"), cmd.Drink, strconv.Itoa(cmd.Quantity)})
+		if err != nil {
+			return err
+		}
+	}
+
+	fmt.Println("Exported in commandes.csv")
+	return nil
+}
+
+func (d *Distributeur) Restock() {
+	fmt.Println("Modifier une boisson:")
+	for boisson, stock := range d.boissons {
+		fmt.Printf("* %s: (%d)\n", boisson, stock)
+	}
+	boisson := d.getUserInput()
+
+	_, ok := d.boissons[boisson]
+	if !ok {
+		return
+	}
+	addStock := 0
+	fmt.Println("Combien:")
+	fmt.Scanln(&addStock)
+	d.boissons[boisson] = d.boissons[boisson] + addStock
 }
